@@ -3,26 +3,38 @@
 // @description Makes entering standard edit reasons a snap.
 // @match       *://*.askubuntu.com/*
 // @match       *://*.mathoverflow.net/*
-// @match       *://*.onstartups.com/*
 // @match       *://*.serverfault.com/*
 // @match       *://*.stackapps.com/*
 // @match       *://*.stackexchange.com/*
 // @match       *://*.stackoverflow.com/*
 // @match       *://*.superuser.com/*
-// @require     http://ajax.googleapis.com/ajax/libs/jquery/2.1.0/jquery.min.js
-// @require     http://ajax.googleapis.com/ajax/libs/jqueryui/1.11.1/jquery-ui.min.js
+// @exclude     *://api.stackexchange.com/*
+// @exclude     *://data.stackexchange.com/*
+// @exclude     *://blog.stackexchange.com/*
+// @exclude     *://blog.stackoverflow.com/*
+// @exclude     *://chat.stackexchange.com/*
+// @exclude     *://chat.stackoverflow.com/*
+// @exclude     *://elections.stackexchange.com/*
+// @exclude     *://openid.stackexchange.com/*
+// @exclude     *://stackexchange.com/*
+// @exclude     *://*/review
+// @require     http://ajax.googleapis.com/ajax/libs/jquery/2.2.4/jquery.min.js
+// @require     http://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js
 // @require     https://gist.github.com/raw/2625891/waitForKeyElements.js
 // @resource    setBtn  https://raw.githubusercontent.com/BrockA/SE-Edit-Reasoner/master/images/settings.png
 // @grant       GM_addStyle
 // @grant       GM_setValue
 // @grant       GM_getValue
 // @grant       GM_getResourceURL
-// @version     2.0
+// @version     2.4
+// @history     2.4 HTTPS support; add Tampermonkey metadata.
+// @history     2.3 Exclude chat.
+// @history     2.2 Exclude some sites, use semicolon for better calarity/grammar.
 // @history     2.0 Added configurable options/reasons.
 // @history     1.1 Period fix and CSS tweak.
 // @history     1.0 Initial release
-// @updateURL   https://github.com/BrockA/SE-Edit-Reasoner/raw/master/stack_exchange_edit_reasoner.user.js
-// @downloadURL https://github.com/BrockA/SE-Edit-Reasoner/raw/master/stack_exchange_edit_reasoner.user.js
+// @author      Brock Adams
+// @homepage    http://stackapps.com/a/5060/7653
 // ==/UserScript==
 /*--- Notes:
     1) The max length of a reason is 300 characters.  We let the site check for that, but keep it in mind.
@@ -33,7 +45,6 @@
     5) Future?: Make a proper SA post and link-in
     6) Future?: Smart, configurable, previewable auto-corrections (especially "i", as Browser tools muff that one).
 */
-//var siteCustomList  = GM_getValue ("sitesWithCustomLists");
 var reasonArray     = GM_getValue ("reasonArray", "");
 if (reasonArray) {
     reasonArray     = JSON.parse (reasonArray);
@@ -80,7 +91,7 @@ $("#content").on ("change", ".gmEditControls input[type='checkbox']",  function 
     var jThis       = $(this);
     var chckdBoxes  = jThis.parent ().parent ().find ("input:checked");
     var chckdText   = chckdBoxes.map ( function () { return this.value; } ).get ();
-    var finalText   = chckdText.join (", ") + ".";
+    var finalText   = chckdText.join ("; ") + ".";
     finalText       = finalText.substr (0, 1).toLocaleUpperCase () + finalText.slice (1);
     if (finalText == ".")   finalText = "";
 
@@ -109,11 +120,10 @@ var initJQUI_CSS    = function () {
     /*--- Load jQuery-UI CSS, one time, on demand only.
         We add the CSS this way so that the embedded, relatively linked images load correctly.
     */
-    $("head").append (
-        '<link '
-      + 'href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.11.1/themes/le-frog/jquery-ui.min.css" '
-      + 'rel="stylesheet" type="text/css">'
-    );
+    $("head").append ( `
+        <link href="//ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/themes/le-frog/jquery-ui.min.css"
+        rel="stylesheet" type="text/css">
+    ` );
 }
 
 function activateOptionsDialog () {
@@ -124,19 +134,19 @@ function activateOptionsDialog () {
     $("body").append ('<div id="gmOverlayDialog"></div>');
 
     var editControls    = $('<div class="gmOptionControls"></div>');
-    editControls.append ( '                                                                 \
-        <table class="gmReasonInpTbl">                                                      \
-            <thead>                                                                         \
-            <tr>                                                                            \
-                <th>Label</th>                                                              \
-                <th>Reason text</th>                                                        \
-                <th>delete</th>                                                             \
-            </tr>                                                                           \
-            </thead>                                                                        \
-            <tbody>                                                                         \
-            </tbody>                                                                        \
-        </table>                                                                            \
-    ' );
+    editControls.append ( `
+        <table class="gmReasonInpTbl">
+            <thead>
+            <tr>
+                <th>Label</th>
+                <th>Reason text</th>
+                <th>delete</th>
+            </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+    ` );
     var controlsTable   = editControls.find (".gmReasonInpTbl > tbody");
 
     $.each (reasonArray, function () {
@@ -305,7 +315,7 @@ function protectUnsavedChanges (zEvent) {
     return confirm ("Discard unsaved changes?!");
 }
 
-GM_addStyle ( multilineStr ( function () {/*!
+GM_addStyle ( `
     .gmEditControls {
         margin-bottom: 1ex;
         position: relative;
@@ -398,13 +408,9 @@ GM_addStyle ( multilineStr ( function () {/*!
         margin: 0;
         color: black;
     }
-*/} ) );
-
-function multilineStr (dummyFunc) {
-    var str = dummyFunc.toString ();
-    str     = str.replace (/^[^\/]+\/\*!?/, '') // Strip function() { /*!
-            .replace (/\s*\*\/\s*\}\s*$/, '')   // Strip */ }
-            .replace (/\/\/.+$/gm, '') // Double-slash comments wreck CSS. Strip them.
-            ;
-    return str;
-}
+    /*-- Another JQUI WTF: */
+    .ui-dialog-titlebar-close {
+        margin-top: -2.3ex !important;
+        margin-right: -1ex !important;
+    }
+` );
