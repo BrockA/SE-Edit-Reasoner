@@ -10,23 +10,22 @@
 // @match       *://*.superuser.com/*
 // @exclude     *://api.stackexchange.com/*
 // @exclude     *://data.stackexchange.com/*
-// @exclude     *://blog.stackexchange.com/*
-// @exclude     *://blog.stackoverflow.com/*
-// @exclude     *://chat.stackexchange.com/*
-// @exclude     *://chat.stackoverflow.com/*
+// @exclude     *://blog.*.com/*
+// @exclude     *://chat.*.com/*
 // @exclude     *://elections.stackexchange.com/*
 // @exclude     *://openid.stackexchange.com/*
 // @exclude     *://stackexchange.com/*
 // @exclude     *://*/review
-// @require     http://ajax.googleapis.com/ajax/libs/jquery/2.2.4/jquery.min.js
-// @require     http://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js
+// @require     https://ajax.googleapis.com/ajax/libs/jquery/2.2.4/jquery.min.js
+// @require     https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js
 // @require     https://gist.github.com/raw/2625891/waitForKeyElements.js
 // @resource    setBtn  https://raw.githubusercontent.com/BrockA/SE-Edit-Reasoner/master/images/settings.png
 // @grant       GM_addStyle
 // @grant       GM_setValue
 // @grant       GM_getValue
 // @grant       GM_getResourceURL
-// @version     2.4
+// @version     2.5
+// @history     2.5 Compensate for SE layout/CSS changes; Clear ESlint squawks; Code tweaks.
 // @history     2.4 HTTPS support; add Tampermonkey metadata.
 // @history     2.3 Exclude chat.
 // @history     2.2 Exclude some sites, use semicolon for better calarity/grammar.
@@ -35,7 +34,11 @@
 // @history     1.0 Initial release
 // @author      Brock Adams
 // @homepage    http://stackapps.com/a/5060/7653
+// @run-at      document-end
 // ==/UserScript==
+/* global $, waitForKeyElements */
+/* eslint-disable no-multi-spaces, curly */
+
 /*--- Notes:
     1) The max length of a reason is 300 characters.  We let the site check for that, but keep it in mind.
     2) Future?: Add KB shortcut to jump straight to edit reason (too many tabs for some operations).
@@ -151,13 +154,13 @@ function activateOptionsDialog () {
 
     $.each (reasonArray, function () {
         //-- this = [<label>, <Reason text>]
-        controlsTable.append ( '                                                            \
-            <tr>                                                                            \
-                <td><input type="text" value="' + this[0] + '" class="gmLabelTxt"></td>     \
-                <td><input type="text" value="' + this[1] + '" class="gmReasonTxt"></td>    \
-                <td><div class="popup-close"><a title="Delete this entry.">×</a></div></td> \
-            </tr>                                                                           \
-        ' );
+        controlsTable.append ( `
+            <tr>
+                <td><input type="text" value="${this[0]}" class="gmLabelTxt"></td>
+                <td><input type="text" value="${this[1]}" class="gmReasonTxt"></td>
+                <td><div class="gmPpopupClose"><a title="Delete this entry.">×</a></div></td>
+            </tr>
+        ` );
     } );
 
     editControls.append (
@@ -165,12 +168,12 @@ function activateOptionsDialog () {
         '<button id="gmAddRow" class="ui-button ui-widget ui-state-default ui-corner-all">New row +</button>'
     );
     //--- Leveraging SE's styles classes for the Save and Cancel buttons:
-    editControls.append ( '                                                                             \
-        <div class="form-submit">                                                                       \
-                <input type="submit" value="Save Changes" id="gmSaveChanges">                           \
-                <a class="cancel-edit" href="javascript:void(0)" id="gmCancel">cancel</a>               \
-        </div>                                                                                          \
-    ' );
+    editControls.append ( `
+        <div class="form-submit">
+                <input type="submit" value="Save Changes" id="gmSaveChanges">
+                <a class="cancel-edit" href="javascript:void(0)" id="gmCancel">cancel</a>
+        </div>
+    ` );
 
     var controlsDialog  = $("#gmOverlayDialog");
     editControls.appendTo (controlsDialog);
@@ -205,7 +208,7 @@ function activateOptionsDialog () {
     $(".gmReasonInpTbl > tbody").sortable ();
 
     //--- Activate all of the buttons
-    controlsDialog.on ("click", ".popup-close > a", function (zEvent) {
+    controlsDialog.on ("click", ".gmPpopupClose > a", function (zEvent) {
         $(this).parents (".gmReasonInpTbl > tbody > tr").remove ();
     } );
 
@@ -229,13 +232,13 @@ function activateOptionsDialog () {
             case "click":
                 switch (this.id) {
                     case "gmAddRow":
-                        $(".gmReasonInpTbl > tbody").append ( '                                             \
-                            <tr>                                                                            \
-                                <td><input type="text" value="" class="gmLabelTxt"></td>                    \
-                                <td><input type="text" value="" class="gmReasonTxt"></td>                   \
-                                <td><div class="popup-close"><a title="Delete this entry.">×</a></div></td> \
-                            </tr>                                                                           \
-                        ' );
+                        $(".gmReasonInpTbl > tbody").append ( `
+                            <tr>
+                                <td><input type="text" value="" class="gmLabelTxt"></td>
+                                <td><input type="text" value="" class="gmReasonTxt"></td>
+                                <td><div class="gmPpopupClose"><a title="Delete this entry.">×</a></div></td>
+                            </tr>
+                        ` );
                         break;
                     case "gmSaveChanges":
                         if (updateReasonsArray () )
@@ -260,8 +263,8 @@ function removeOptionsDialog () {
     var optionsDlg      = $("#gmOverlayDialog");
     if (optionsDlg.dialog ("instance") )
         optionsDlg.dialog ("destroy");
-    else
-        optionsDlg.remove ();
+
+    optionsDlg.remove ();
 }
 
 function updateReasonsArray () {
@@ -282,12 +285,12 @@ function updateReasonsArray () {
 
     if (newReasons.length == 0) {
         // No valid entries.
-        $(".gmOptionControls > .form-submit").before ( '                                                    \
-            <div class="gmError ui-state-error ui-corner-all">                                              \
-                <p><span class="ui-icon ui-icon-alert" style="float: left; margin-right: 0.3em;"></span>    \
-                There are no valid entries!</p>                                                             \
-            </div>                                                                                          \
-        ' );
+        $(".gmOptionControls > .form-submit").before ( `
+            <div class="gmError ui-state-error ui-corner-all">
+                <p><span class="ui-icon ui-icon-alert" style="float: left; margin-right: 0.3em;"></span>
+                There are no valid entries!</p>
+            </div>
+        ` );
 
         return false;
     }
@@ -324,11 +327,11 @@ GM_addStyle ( `
     .gmEditControls > label {
         color: black;
         cursor: pointer;
-        display: inline-block;
-        font-weight: normal;
+        display: inline-block !important;
+        font-weight: normal !important;
         line-height: 1.5;
         margin-right: 1em;
-        padding: 0 0.3ex;
+        padding: 0 0.3ex !important;
     }
     .gmEditControls > label:hover {
         background: lightyellow;
@@ -353,6 +356,9 @@ GM_addStyle ( `
     .gmOptionControls {
         text-align: left;
     }
+    .gmOptionControls *:after {
+        box-sizing: unset !important;
+    }
     .gmReasonInpTbl tr > td {
         padding: 0 3ex 0 0.6ex;
     }
@@ -367,8 +373,9 @@ GM_addStyle ( `
     }
     .gmLabelTxt, .gmReasonTxt {
         width: 100%;
+        padding: 0.3ex 1ex !important;
     }
-    .gmReasonInpTbl > tbody > tr > td > .popup-close {
+    .gmReasonInpTbl > tbody > tr > td > .gmPpopupClose {
         float: left;
     }
     .gmReasonInpTbl > tbody > tr {
@@ -380,10 +387,10 @@ GM_addStyle ( `
     .gmReasonInpTbl > tbody > tr:nth-child(even) {
         background-color: #61A030;
     }
-    .popup-close > a:hover {
+    .gmPpopupClose > a:hover {
         color: red !important;
     }
-    .popup-close:hover {
+    .gmPpopupClose:hover {
         border: 1px outset red;
     }
     .gmOptionControls > .form-submit {
